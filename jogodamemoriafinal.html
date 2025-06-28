@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>🎉 Jogo da Memória!</title>
+  <style>
+    body {
+      font-family: Comic Sans MS, cursive, sans-serif;
+      background: linear-gradient(to bottom right, #ffe4e1, #fddde6);
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      color: #444;
+    }
+
+    /* Navbar */
+    nav {
+      background-color: #b30000;  /* vermelho escuro */
+      padding: 15px 20px;
+      text-align: left;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    nav a#nomeApp {
+      color: white;
+      text-decoration: none;
+      user-select: none;
+      font-weight: bold;
+      font-size: 1.5rem;
+    }
+
+    nav a#nomeApp:hover,
+    nav a#nomeApp:focus {
+      color: #ffb6c1;
+      outline: none;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin: 20px 0 5px 0;
+    }
+
+    p, #tentativas {
+      font-size: 1.2rem;
+      margin-bottom: 15px;
+    }
+
+    #tabuleiro {
+      display: grid;
+      justify-content: center;
+      margin: auto;
+      max-width: 700px;
+    }
+
+    .carta {
+      width: 80px;
+      height: 80px;
+      background-color: #78ccf3;
+      font-size: 2rem;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.4s, background-color 0.3s;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      user-select: none;
+    }
+
+    .carta:hover {
+      transform: scale(1.05);
+    }
+
+    .carta.virada {
+      background-color: #fffacd;
+      color: #000;
+      pointer-events: none;
+    }
+
+    .carta.certa {
+      background-color: #98fb98 !important;
+      transform: scale(1.1);
+    }
+
+    .carta.errada {
+      background-color: #f97167 !important;
+    }
+
+    select, button {
+      font-size: 1rem;
+      padding: 8px 12px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    button {
+      background-color: #ffb6c1;
+    }
+
+    #controles {
+      margin-bottom: 20px;
+    }
+
+    #proximoNivel {
+      display: none;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="index.html" id="nomeApp">🎉 QUIZ FMP</a>
+  </nav>
+
+  <h1>🧠 Jogo da Memória!</h1>
+  <p>Encontre todos os pares de carinhas e docinhos!</p>
+
+  <div id="controles">
+    <label for="dificuldade">Dificuldade: </label>
+    <select id="dificuldade" onchange="trocarDificuldadeManual()">
+      <option value="facil">Fácil</option>
+      <option value="medio">Médio</option>
+      <option value="dificil">Difícil</option>
+    </select>
+    <button onclick="window.location.reload()">🔄 Reiniciar</button>
+  </div>
+
+  <p id="tentativas">Tentativas: 0</p>
+  <div id="tabuleiro"></div>
+
+  <button id="proximoNivel" onclick="avancarNivel()">➡️ Próximo Nível</button>
+
+  <!-- 🎵 Áudio de fundo -->
+  <audio id="musicaFundo" loop>
+    <source src="https://vgmsite.com/soundtracks/kirby-s-epic-yarn-original-soundtrack/qedxzmtf/1-01%20Green%20Greens.mp3" type="audio/mp3">
+  </audio>
+
+  <!-- 🔊 Som de clique -->
+  <audio id="somClique" preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c9cfb1e9c0.mp3?filename=mouse-click-124203.mp3" type="audio/mp3">
+  </audio>
+
+  <script>
+    const todosEmojis = ['🍭','🍩','🍎','🍓','🍌','🍇','😀','😺','🍫','🍒','😸','😻','🥝','🍈','😋','🍬','🍍','😛'];
+    const tabuleiro = document.getElementById('tabuleiro');
+    const tentativasText = document.getElementById('tentativas');
+    const selectDificuldade = document.getElementById('dificuldade');
+    const botaoProximoNivel = document.getElementById('proximoNivel');
+
+    const musica = document.getElementById('musicaFundo');
+    const somClique = document.getElementById('somClique');
+
+    let primeiraCarta = null;
+    let bloqueado = false;
+    let paresEncontrados = 0;
+    let tentativas = 0;
+    let nivelAtual = 0;
+
+    const niveis = [
+      { nome: "facil", pares: 4, colunas: 4 },
+      { nome: "medio", pares: 8, colunas: 4 },
+      { nome: "dificil", pares: 18, colunas: 6 }
+    ];
+
+    function iniciarNivel(nivel) {
+      tabuleiro.innerHTML = "";
+      primeiraCarta = null;
+      bloqueado = false;
+      paresEncontrados = 0;
+      tentativas = 0;
+      tentativasText.textContent = "Tentativas: 0";
+      botaoProximoNivel.style.display = "none";
+
+      const config = niveis[nivel];
+      selectDificuldade.value = config.nome;
+
+      let cartas = [...todosEmojis.slice(0, config.pares), ...todosEmojis.slice(0, config.pares)];
+      cartas.sort(() => 0.5 - Math.random());
+
+      tabuleiro.style.gridTemplateColumns = `repeat(${config.colunas}, 80px)`;
+
+      cartas.forEach((emoji, index) => {
+        const carta = document.createElement('div');
+        carta.classList.add('carta');
+        carta.dataset.emoji = emoji;
+        carta.dataset.index = index;
+        carta.textContent = '❓';
+        tabuleiro.appendChild(carta);
+
+        carta.addEventListener('click', () => {
+          if (bloqueado || carta.classList.contains('virada')) return;
+
+          somClique.pause();
+          somClique.currentTime = 0;
+          somClique.play();
+
+          if (!musica.played.length) musica.play().catch(() => {});
+
+          carta.textContent = emoji;
+          carta.classList.add('virada');
+
+          if (!primeiraCarta) {
+            primeiraCarta = carta;
+          } else {
+            bloqueado = true;
+            tentativas++;
+            tentativasText.textContent = `Tentativas: ${tentativas}`;
+
+            if (primeiraCarta.dataset.emoji === carta.dataset.emoji) {
+              primeiraCarta.classList.add('certa');
+              carta.classList.add('certa');
+              primeiraCarta = null;
+              bloqueado = false;
+              paresEncontrados++;
+
+              if (paresEncontrados === config.pares) {
+                setTimeout(() => {
+                  alert(`🎉 Parabéns! Você completou o nível ${config.nome.toUpperCase()} com ${tentativas} tentativas!`);
+                  if (nivelAtual < niveis.length - 1) {
+                    botaoProximoNivel.style.display = "inline-block";
+                  } else {
+                    alert("🏁 Você completou todos os níveis! Excelente memória!");
+                  }
+                }, 500);
+              }
+            } else {
+              primeiraCarta.classList.add('errada');
+              carta.classList.add('errada');
+              setTimeout(() => {
+                primeiraCarta.textContent = '❓';
+                carta.textContent = '❓';
+                primeiraCarta.classList.remove('virada', 'errada');
+                carta.classList.remove('virada', 'errada');
+                primeiraCarta = null;
+                bloqueado = false;
+              }, 1000);
+            }
+          }
+        });
+      });
+    }
+
+    function avancarNivel() {
+      if (nivelAtual < niveis.length - 1) {
+        nivelAtual++;
+        iniciarNivel(nivelAtual);
+      }
+    }
+
+    function trocarDificuldadeManual() {
+      const selecionado = selectDificuldade.value;
+      nivelAtual = niveis.findIndex(n => n.nome === selecionado);
+      iniciarNivel(nivelAtual);
+    }
+
+    iniciarNivel(nivelAtual);
+  </script>
+</body>
+</html>
